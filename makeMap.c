@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sqlite3.h>
 #include <string.h>
+#include <math.h>
 
 int split(char *string, char sep, int n_char, char ***array_values)
 {
@@ -53,12 +54,32 @@ void deconstructor(void *string)
 	 */
 }
 
+double distance(double x1, double y1, double z1, double x2, double y2, double z2)
+{
+	double x, y, z;
+	double ris;
+	x = x1 - x2;
+	if(x < 0)
+		x = -x;
+	y = y1 - y2;
+	if(y < 0)
+		y = -y;
+	z = z1 - z2;
+	if(z < 0)
+		z = -z;
+	ris = sqrt(x * x + y * y);
+	ris = sqrt(ris * ris + z * z);
+	return ris;
+}
+
 int main()
 {
 	char *db_name = "map.db";
 	char *data_source = "systems.csv";
 	sqlite3 *conn;
 	sqlite3_stmt *statement;
+	sqlite3_stmt *statement2;
+	sqlite3_stmt *insert_statement;
 	char *errMsg;
 	char *query;
 	int status;
@@ -67,6 +88,8 @@ int main()
 	size_t buffer_len = 0;
 	char **values;
 	int n_values;
+
+	const int JUMP_DISTANCE = 20;
 
 	status = sqlite3_open(db_name, &conn);
 	if(status == SQLITE_ERROR)
@@ -131,7 +154,7 @@ int main()
 	{
 		n_values = split(buffer, ',', strlen(buffer), &values);
 		sqlite3_bind_int(statement, 1, atoi(values[0]));
-		sqlite3_bind_text(statement, 2, values[2], -1, NULL);
+		sqlite3_bind_text(statement, 2, values[2], -1, NULL); // Using NULL instead of deconstructor
 		sqlite3_bind_double(statement, 3, atof(values[3]));
 		sqlite3_bind_double(statement, 4, atof(values[4]));
 		sqlite3_bind_double(statement, 5, atof(values[5]));
@@ -152,16 +175,107 @@ int main()
 		return 1;
 	}
 	printf("done\n");
+	fclose(fd);
 
 	status = sqlite3_finalize(statement);
 	if(status == SQLITE_ERROR)
 	{
-		printf("Error: %d\n", sqlite3_errmsg(conn));
+		printf("Error: %s\n", sqlite3_errmsg(conn));
 		return 1;
 	}
 
-	//TODO Calculate distances and insert neighbors
+	// Create neighbors table
+	query = "CREATE TABLE neighbors(\
+	       from_id INT NOT NULL,\
+	       distance FLOAT NOT NULL,\
+	       to_id INT NOT NULL,\
+	       FOREIGN KEY (from_id) REFERENCES systems(id),\
+	       FOREIGN KEY (to_id) REFERENCES systems(id))";
+	status = sqlite3_prepare(conn, query, -1, &statement, NULL);
+	if(status == SQLITE_ERROR)
+	{
+		printf("Error: %s\n", sqlite3_errmsg(conn));
+		return 1;
+	}
+	sqlite3_step(statement);
+	sqlite3_finalize(statement);
 
-	fclose(fd);
+	// Calculate distances and insert neighbors
+	status = sqlite3_prepare(conn, "SELECT * FROM systems", -1, &statement, NULL);
+	if(status == SQLITE_ERROR)
+	{
+		printf("Error: %s\n", sqlite3_errmsg(conn));
+		return 1;
+	}
+
+	query = "SELECT * FROM systems WHERE x >= ? AND x <= ? AND y >= ? AND y <= ? AND z >= ? AND z <= ?";
+	status = sqlite3_prepare(conn, query, -1, &statement2, NULL);
+	if(status == SQLITE_ERROR)
+	{
+		printf("Error: %s\n", sqlite3_errmsg(conn));
+		return 1;
+	}
+
+	query = "INSERT INTO neighbors(from_id, distance, to_id) VALUES (?, ?, ?)";
+	status = sqlite3_prepare(conn, query, -1, &insert_statement, NULL);
+	if(status == SQLITE_ERROR)
+	{
+		printf("Error: %s\n", sqlite3_errmsg(conn));
+		return 1;
+	}
+
+	printf("Calculating distances...");
+	fflush(stdout);
+	while(sqlite3_step(statement) == SQLITE_ROW)
+	{
+		int id1;
+		double x1, y1, z1;
+		id1 = sqlite3_column_int(statement, 0);
+		x1 = sqlite3_column_double(statement, 2);
+		y1 = sqlite3_column_double(statement, 3);
+		z1 = sqlite3_column_double(statement, 4);
+
+		sqlite3_bind_double(statement2, 1, x1 - JUMP_DISTANCE);
+		sqlite3_bind_double(statement2, 2, x1 + JUMP_DISTANCE);
+		sqlite3_bind_double(statement2, 3, y1 - JUMP_DISTANCE);
+		sqlite3_bind_double(statement2, 4, y1 + JUMP_DISTANCE);
+		sqlite3_bind_double(statement2, 5, z1 - JUMP_DISTANCE);
+		sqlite3_bind_double(statement2, 6, z1 + JUMP_DISTANCE);
+
+		while(sqlite3_step(statement2) == SQLITE_ROW)
+		{
+			int id2;
+			double dista;
+			double x2, y2, z2;
+			id2 = sqlite3_column_int(statement2, 0);
+			x2 = sqlite3_column_double(statement2, 2);
+			y2 = sqlite3_column_double(statement2, 3);
+			z2 = sqlite3_column_double(statement2, 4);
+
+			dista = distance(x1, y1, z1, x2, y2, z2);
+			if(dista <= JUMP_DISTANCE)
+			{
+				sqlite3_bind_int(insert_statement, 1, id1);
+				sqlite3_bind_double(insert_statement, 2, dista);
+				sqlite3_bind_int(insert_statement, 3, id2);
+
+				status = sqlite3_step(insert_statement);
+				if(status == SQLITE_ERROR)
+				{
+					printf("Error: %s\n", sqlite3_errmsg(conn));
+					return 1;
+				}
+				sqlite3_reset(insert_statement);
+			}
+		}
+
+		sqlite3_reset(statement2);
+	}
+	printf("done\n");
+
+	sqlite3_finalize(statement);
+	sqlite3_finalize(statement2);
+	sqlite3_finalize(insert_statement);
+
 	sqlite3_close(conn);
 }
