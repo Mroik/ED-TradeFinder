@@ -3,27 +3,40 @@
 #include <sqlite3.h>
 #include <string.h>
 
-// This function will return an array of strings
-// which is an array of chars, therefore every
-// pointer inside the pointer will have to be
-// freed (excuse the poorly written comments)
-char **split(char *string, char sep, int n_char, int *n_str)
+int split(char *string, char sep, int n_char, char ***array_values)
 {
-	//TODO Implement
-	char **ris;
-	int n_str = 1;
+	int n_values = 1;
+	int start = 0;
 
-	for(int x = 0; x < n_str; x++)
+	for(int x = 0; x < n_char; x++)
 	{
 		if(string[x] == sep)
-			n_str++;
+			n_values++;
 	}
-	ris = (char**)(malloc(sizeof(char**)*n_str));
+	*array_values = malloc(n_values * sizeof(char**));
+
+	for(int x = 0; x < n_values; x++)
+	{
+		for(int y = start; y <= n_char; y++)
+		{
+			if(string[y] == sep || string[y] == '\0')
+			{
+				(*array_values)[x] = malloc((y - start + 1) * sizeof(char*));
+				for(int z = 0; z < y - start; z++)
+					(*array_values)[x][z] = string[z + start];
+				(*array_values)[x][y - start] = '\0';
+				start = y + 1;
+				break;
+			}
+		}
+	}
+
+	return n_values;
 }
 
 int main()
 {
-	char *db_name = "test.db";
+	char *db_name = "map.db";
 	sqlite3 *conn;
 	sqlite3_stmt *statement;
 	char *errMsg;
@@ -37,7 +50,7 @@ int main()
 		 y FLOAT NOT NULL,\
 		 z FLOAT NOT NULL)";
 	status = sqlite3_open(db_name, &conn);
-	if(status)
+	if(status == SQLITE_ERROR)
 	{
 		printf("Error: %s\n", sqlite3_errmsg(conn));
 		return 1;
@@ -45,7 +58,7 @@ int main()
 
 	// Remember to destroy prepared statements to avoid mem leaks
 	status = sqlite3_prepare(conn, query, -1, &statement, NULL);
-	if(status)
+	if(status == SQLITE_ERROR)
 	{
 		printf("Error: %s\n", sqlite3_errmsg(conn));
 		return 1;
@@ -56,7 +69,7 @@ int main()
 
 	// This function is used to destroy a prepared statement
 	status = sqlite3_finalize(statement);
-	if(status)
+	if(status == SQLITE_ERROR)
 	{
 		printf("Error: %s\n", sqlite3_errmsg(conn));
 		return 1;
