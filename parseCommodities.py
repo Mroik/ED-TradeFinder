@@ -40,7 +40,7 @@ class Galaxy:
             self.visited.clear()
             self.routeExists = False
         for x in start.neighbors:
-            if x.id is not in self.visited:
+            if x.id not in self.visited:
                 self.visited.append(x.id)
                 surface = self.doesRouteExist(x, end)
                 if surface == True:
@@ -84,7 +84,7 @@ def loadMap(start, end):
         for syss in galaxy.systems:
             cursor2.execute(query)
             for neigh in cursor2:
-                if neigh[2] is in galaxy.systems:
+                if neigh[2] in galaxy.systems:
                     system.addNeighbor(neigh[2])
         cursor.close()
         cursor2.close()
