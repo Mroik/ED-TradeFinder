@@ -6,14 +6,8 @@ from math import sqrt
 
 def distance(x1, x2, y1, y2, z1, z2):
     x = x1 - x2
-    if x < 0:
-        x = -x
     y = y1 - y2
-    if y < 0:
-        y = -y
     z = z1 - z2
-    if z < 0:
-        z = -z
     ris = sqrt(x*x + y*y)
     ris = sqrt(ris*ris + z*z)
     return ris
