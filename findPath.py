@@ -19,17 +19,29 @@ def pathExists(start_id, finish_id, max_jump):
     global galaxy
 
     if start_id == finish_id:
-        return True
+        return True,[start_id]
 
-    print("Visiting:",galaxy[start_id]["name"])
+    print("Visiting:",galaxy[start_id]["name"], flush=True)
     
     visited_systems.append(start_id)
+
+    # Order based on distance from finish
+    if len(galaxy[start_id]["neighbors"]) > 1:
+        for x in range(0, len(galaxy[start_id]["neighbors"]) - 1):
+            for y in range(x+1, len(galaxy[start_id]["neighbors"])):
+                if galaxy[galaxy[start_id]["neighbors"][x]]["distance"] > galaxy[galaxy[start_id]["neighbors"][y]]["distance"]:
+                    temp = galaxy[start_id]["neighbors"][x]
+                    galaxy[start_id]["neighbors"][x] = galaxy[start_id]["neighbors"][y]
+                    galaxy[start_id]["neighbors"][y] = temp
+
     for x in galaxy[start_id]["neighbors"]:
         if x in visited_systems:
             continue
-        if pathExists(x, finish_id, max_jump):
-            return True
-    return False
+        temp, temp2 = pathExists(x, finish_id, max_jump)
+        if temp:
+            temp2.append(start_id)
+            return True,temp2
+    return False,None
 
 def loadMap(conn, start, finish):
     global galaxy
@@ -59,30 +71,60 @@ def loadMap(conn, start, finish):
                 "x": row[2],
                 "y": row[3],
                 "z": row[4],
-                "neighbors": []
+                "neighbors": [],
+                "distance": 0
         }
     cursor.close()
 
-def genNeighbors(max_jump):
+def genNeighbors(max_jump, finish):
     global galaxy
     for i in galaxy:
+        galaxy[i]["distance"] = distance(galaxy[i]["x"], galaxy[i]["y"], galaxy[i]["z"], galaxy[finish]["x"], galaxy[finish]["y"], galaxy[finish]["z"])
         for j in galaxy:
             if i != j and distance(galaxy[i]["x"], galaxy[i]["y"], galaxy[i]["z"], galaxy[j]["x"], galaxy[j]["y"], galaxy[j]["z"]) <= max_jump:
                 galaxy[i]["neighbors"].append(j)
 
-DB_FILE = "map.db"
-START = 1
-FINISH = 30
-MAX_JUMP = 25
+if __name__ == "__main__":
+    from matplotlib import pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    DB_FILE = "map.db"
+    START = 1
+    FINISH = 30
+    MAX_JUMP = 25
 
-visited_systems = []
-galaxy = {}
+    visited_systems = []
+    galaxy = {}
 
-conn = sqlite3.connect(DB_FILE)
-loadMap(conn, START, FINISH)
-genNeighbors(MAX_JUMP)
-conn.close()
-if pathExists(START, FINISH, MAX_JUMP):
-    print("Path exists between {} and {}".format(START, FINISH))
-else:
-    print("Path does not exists between {} and {}".format(START, FINISH))
+    conn = sqlite3.connect(DB_FILE)
+    loadMap(conn, START, FINISH)
+    genNeighbors(MAX_JUMP, FINISH)
+    conn.close()
+    temp,temp2 = pathExists(START, FINISH, MAX_JUMP)
+    if temp:
+        print("Path exists between {} and {}".format(START, FINISH))
+
+        x = []
+        y = []
+        z = []
+        x1 = []
+        y1 = []
+        z1 = []
+        for i in galaxy:
+            x.append(galaxy[i]["x"])
+            y.append(galaxy[i]["y"])
+            z.append(galaxy[i]["z"])
+        fig = plt.figure()
+        ax_galaxy = fig.add_subplot(projection="3d")
+        ax_galaxy.scatter(x,y,z)
+        for a in temp2:
+            x1.append(galaxy[a]["x"])
+            y1.append(galaxy[a]["y"])
+            z1.append(galaxy[a]["z"])
+        ax_galaxy.plot(x1,y1,z1,c="red")
+        plt.show()
+        fig.savefig("{}to{}.png".format(START, FINISH))
+    else:
+        print("Path does not exists between {} and {}".format(START, FINISH))
+
+    print(galaxy[START]["name"])
+    print(galaxy[FINISH]["name"])
