@@ -14,9 +14,7 @@ def distance(x1, y1, z1, x2, y2, z2):
     ris = math.sqrt(ris*ris + z*z)
     return ris
 
-def pathExists(start_id, finish_id, max_jump):
-    global visited_systems
-    global galaxy
+def pathExists(start_id, finish_id, max_jump, galaxy, visited_systems):
 
     if start_id == finish_id:
         return True,[start_id]
@@ -37,14 +35,13 @@ def pathExists(start_id, finish_id, max_jump):
     for x in galaxy[start_id]["neighbors"]:
         if x in visited_systems:
             continue
-        temp, temp2 = pathExists(x, finish_id, max_jump)
+        temp, temp2 = pathExists(x, finish_id, max_jump, galaxy, visited_systems)
         if temp:
             temp2.append(start_id)
             return True,temp2
     return False,None
 
-def loadMap(conn, start, finish):
-    global galaxy
+def loadMap(conn, start, finish, galaxy):
     cursor = conn.cursor()
     query = "SELECT * FROM systems WHERE id = ?"
     cursor.execute(query, (start,))
@@ -76,8 +73,7 @@ def loadMap(conn, start, finish):
         }
     cursor.close()
 
-def genNeighbors(max_jump, finish):
-    global galaxy
+def genNeighbors(max_jump, finish, galaxy):
     for i in galaxy:
         galaxy[i]["distance"] = distance(galaxy[i]["x"], galaxy[i]["y"], galaxy[i]["z"], galaxy[finish]["x"], galaxy[finish]["y"], galaxy[finish]["z"])
         for j in galaxy:
@@ -96,10 +92,10 @@ if __name__ == "__main__":
     galaxy = {}
 
     conn = sqlite3.connect(DB_FILE)
-    loadMap(conn, START, FINISH)
-    genNeighbors(MAX_JUMP, FINISH)
+    loadMap(conn, START, FINISH, galaxy)
+    genNeighbors(MAX_JUMP, FINISH, galaxy)
     conn.close()
-    temp,temp2 = pathExists(START, FINISH, MAX_JUMP)
+    temp,temp2 = pathExists(START, FINISH, MAX_JUMP, galaxy, visited_systems)
     if temp:
         print("Path exists between {} and {}".format(START, FINISH))
 

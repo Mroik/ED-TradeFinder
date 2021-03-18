@@ -4,95 +4,12 @@ import json
 import sys
 import subprocess
 import math
+import findPath
 import sqlite3
-from sqlite3 import Error
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 #TODO Check the end of the file
-
-class System:
-    def __init__(self, id, name, x, y, z):
-        self.id = id
-        self.name = name
-        self.x = x
-        self.y = y
-        self.z = z
-        self.neighbors = [] #The list will contain the ids of systems
-
-    def addNeighbor(self, neighbor):
-        self.neighbors.append(neighbor)
-
-class Galaxy:
-    def __init__(self):
-        self.systems = {} #The keys of the dictionary are the id's of the systems
-        self.visited = [] #This is a list of ids
-        self.routeExists = False #This is used in doesRouteExist() as a flag to return the result
-
-    def addSystem(self, system):
-        self.systems[system.id] = system
-
-    #start and end are objects of system
-    def doesRouteExist(self, start, end):
-        if start.id == end.id:
-            self.visited.clear()
-            self.routeExists = True
-            return True
-        if len(self.visited) == len(self.systems):
-            self.visited.clear()
-            self.routeExists = False
-        for x in start.neighbors:
-            if x.id not in self.visited:
-                self.visited.append(x.id)
-                surface = self.doesRouteExist(x, end)
-                if surface == True:
-                    return True
-        return
-
-def loadMap(start, end):
-    galaxy = Galaxy()
-    try:
-        conn = sqlite3.connect("map.db")
-        cursor = conn.cursor()
-        query = "SELECT * FROM systems WHERE systems.id = ?;"
-        cursor.execute(query, start)
-        start = cursor.fetchone()
-        cursor.execute(query, end)
-        end = cursor.fetchone()
-
-        #Fetching only systems between start and end
-        if start[2] < end[2]:
-            min_x, max_x = start[2], end[2]
-        else:
-            min_x, max_x = end[2], start[2]
-        if start[3] < end[3]:
-            min_y, max_y = start[3], end[3]
-        else:
-            min_y, max_y = end[3], start[3]
-        if start[4] < end[4]:
-            min_z, max_z = start[4], end[4]
-        else:
-            min_z, max_z = end[4], start[4]
-        query = "SELECT * FROM systems WHERE systems.x >= ? AND systems.x <= ? AND systems.y >= ? AND systems.y <= ? AND systems.z >= ? AND systems.z <= ?;"
-        data = (min_x, max_x, min_y, max_y, min_z, max_z)
-        cursor.execute(query, data)
-        query = "SELECT * FROM neighbors WHERE from_id = ?;"
-        cursor2 = conn.cursor() #cursor for fetching neighbors
-        for row in cursor:
-            system = System(row[0], row[1], row[2], row[3], row[4])
-            galaxy.addSystem(system)
-        galaxy.addSystem(start)
-        galaxy.addSystem(end)
-        for syss in galaxy.systems:
-            cursor2.execute(query)
-            for neigh in cursor2:
-                if neigh[2] in galaxy.systems:
-                    system.addNeighbor(neigh[2])
-        cursor.close()
-        cursor2.close()
-        conn.close()
-        return galaxy
-    except Error as err:
-        print(err)
-        return None
 
 def distance(system1, system2):
     x = system1["x"] - system2["x"]
@@ -110,7 +27,7 @@ def distance(system1, system2):
 
 listings = []
 
-print("Parsing \"listings.csv\"...", flush = True, end = "", file = sys.stderr)
+print("Parsing \"listings.csv\"...", flush = True, end = "")
 f = open("listings.csv", "r")
 
 for line in f:
@@ -130,9 +47,9 @@ for line in f:
 
 f.close()
 
-print("done", file = sys.stderr)
+print("done")
 
-print("Parsing \"commodities.json\"...", flush = True, end = "", file = sys.stderr)
+print("Parsing \"commodities.json\"...", flush = True, end = "")
 f = open("commodities.json")
 data = json.loads(f.read())
 f.close()
@@ -147,7 +64,7 @@ for x in range(len(listings)):
 
 print("done", file = sys.stderr)
 
-print("Parsing \"stations.json\"...", flush = True, end = "", file = sys.stderr)
+print("Parsing \"stations.json\"...", flush = True, end = "")
 f = open("stations.json", "r")
 data = json.loads(f.read())
 f.close()
@@ -165,7 +82,7 @@ for x in range(len(listings)):
     listings[x]["system_id"] = reference[listings[x]["station_id"]]["system_id"]
     listings[x]["max_landing_pad_size"] = reference[listings[x]["station_id"]]["max_landing_pad_size"]
 
-print("done", file = sys.stderr)
+print("done")
 
 ########################
 
@@ -183,4 +100,46 @@ for x in listings:
         if x["name"] == sys.argv[1] and x["sell_price"] != 0:
             sell_place = x
 
+print("Profit: {}".format(profit))
+
+buy_place = buy_place["system_id"]
+sell_place = sell_place["system_id"]
+
 #TODO Implement route checking for the trade route
+if buy_place != None and sell_place != None:
+    galaxy = {}
+    visited_systems = []
+    
+    max_jump = float(sys.argv[2])
+
+    conn = sqlite3.connect("map.db")
+    findPath.loadMap(conn, buy_place, sell_place, galaxy)
+    findPath.genNeighbors(max_jump, sell_place, galaxy)
+    conn.close()
+    
+    status, path = findPath.pathExists(buy_place, sell_place, max_jump, galaxy, visited_systems)
+    if status:
+        print("Path exists between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
+    else:
+        print("Path doesn't exist between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
+        sys.exit()
+
+    x = []
+    y = []
+    z = []
+    x1 = []
+    y1 = []
+    z1 = []
+    for i in galaxy:
+        x.append(galaxy[i]["x"])
+        y.append(galaxy[i]["y"])
+        z.append(galaxy[i]["z"])
+    fig = plt.figure()
+    ax_galaxy = fig.add_subplot(projection="3d")
+    ax_galaxy.scatter(x, y, z, c = "green")
+    for a in path:
+        x1.append(galaxy[a]["x"])
+        y1.append(galaxy[a]["y"])
+        z1.append(galaxy[a]["z"])
+    ax_galaxy.plot(x1, y1, z1, c = "red")
+    plt.show()
