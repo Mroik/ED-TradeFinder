@@ -9,22 +9,6 @@ import sqlite3
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-#TODO Check the end of the file
-
-def distance(system1, system2):
-    x = system1["x"] - system2["x"]
-    if x < 0:
-        x = -x
-    y = system1["y"] - system2["y"]
-    if y < 0:
-        y = -y
-    z = system1["z"] - system2["z"]
-    if z < 0:
-        z = -z
-    ris = math.sqrt(x*x + y*y)
-    ris = math.sqrt(ris*ris + z*z)
-    return ris
-
 listings = []
 
 print("Parsing \"listings.csv\"...", flush = True, end = "")
@@ -92,21 +76,20 @@ for x in listings:
         if x["name"] == sys.argv[1] and x["buy_price"] != 0:
             buy_place = x
 
-profit = buy_place["buy_price"]
-
 sell_place = None
 for x in listings:
     if sell_place == None or sell_place["sell_price"] < x["sell_price"]:
         if x["name"] == sys.argv[1] and x["sell_price"] != 0:
             sell_place = x
 
-print("Profit: {}".format(profit))
+profit = sell_place["sell_price"] - buy_place["buy_price"]
 
 buy_place = buy_place["system_id"]
 sell_place = sell_place["system_id"]
 
-#TODO Implement route checking for the trade route
 if buy_place != None and sell_place != None:
+    print("Loading map data...", flush=True, end = "")
+
     galaxy = {}
     visited_systems = []
     
@@ -116,13 +99,18 @@ if buy_place != None and sell_place != None:
     findPath.loadMap(conn, buy_place, sell_place, galaxy)
     findPath.genNeighbors(max_jump, sell_place, galaxy)
     conn.close()
-    
+    print("done")
+
+    print("Finding path...", flush = True, end = "")
     status, path = findPath.pathExists(buy_place, sell_place, max_jump, galaxy, visited_systems)
-    if status:
-        print("Path exists between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
-    else:
+    print("done")
+    if not status:
         print("Path doesn't exist between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
         sys.exit()
+
+    print("Path exists between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
+    print("Number of jumps: {}".format(len(path) - 1))
+    print("Profit: {}".format(profit))
 
     x = []
     y = []

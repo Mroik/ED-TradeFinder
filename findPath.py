@@ -19,7 +19,7 @@ def pathExists(start_id, finish_id, max_jump, galaxy, visited_systems):
     if start_id == finish_id:
         return True,[start_id]
 
-    print("Visiting:",galaxy[start_id]["name"], flush=True)
+    #print("Visiting:",galaxy[start_id]["name"], flush=True) # DEBUG
     
     visited_systems.append(start_id)
 
