@@ -6,12 +6,11 @@
 
 import json
 import sys
-import subprocess
-import math
 import findPath
 import sqlite3
 from matplotlib import pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import gc
 
 listings = []
 
@@ -65,6 +64,9 @@ for x in data:
             "max_landing_pad_size": x["max_landing_pad_size"]
     }
 
+data = []
+gc.collect()
+
 for x in range(len(listings)):
     listings[x]["station_name"] = reference[listings[x]["station_id"]]["name"]
     listings[x]["system_id"] = reference[listings[x]["station_id"]]["system_id"]
@@ -85,6 +87,9 @@ for x in listings:
     if sell_place == None or sell_place["sell_price"] < x["sell_price"]:
         if x["name"] == sys.argv[1] and x["sell_price"] != 0:
             sell_place = x
+
+listings = []
+gc.collect()
 
 profit = sell_place["sell_price"] - buy_place["buy_price"]
 
@@ -108,6 +113,10 @@ if buy_place != None and sell_place != None:
     print("Finding path...", flush = True, end = "")
     status, path = findPath.pathExists(buy_place, sell_place, max_jump, galaxy, visited_systems)
     print("done")
+
+    visited_systems = []
+    gc.collect()
+
     if not status:
         print("Path doesn't exist between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
         sys.exit()
@@ -151,5 +160,9 @@ if buy_place != None and sell_place != None:
         x1.append(galaxy[a]["x"])
         y1.append(galaxy[a]["y"])
         z1.append(galaxy[a]["z"])
+
+    galaxy = {}
+    gc.collect()
+
     ax_galaxy.plot(x1, y1, z1, c = "red")
     plt.show()
