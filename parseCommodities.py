@@ -1,5 +1,9 @@
 #!/bin/python
 
+# parameters
+# Goods_name, max_jump, frame_shift_rating, ship_mass, ideal_mass, frame_shift_power
+# 1           2         3                   4          5           6
+
 import json
 import sys
 import subprocess
@@ -108,9 +112,27 @@ if buy_place != None and sell_place != None:
         print("Path doesn't exist between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
         sys.exit()
 
+    fuel_needed = 0
+    for x in range(len(path)-1):
+        fuel_needed += findPath.fuelUsage(
+                int(sys.argv[3]),
+                findPath.distance(
+                    galaxy[path[x]]["x"],
+                    galaxy[path[x]]["y"],
+                    galaxy[path[x]]["z"],
+                    galaxy[path[x+1]]["x"],
+                    galaxy[path[x+1]]["y"],
+                    galaxy[path[x+1]]["z"]
+                ),
+                float(sys.argv[4]),
+                float(sys.argv[5]),
+                float(sys.argv[6])
+        )
+
     print("Path exists between {} and {}".format(galaxy[buy_place]["name"], galaxy[sell_place]["name"]))
     print("Number of jumps: {}".format(len(path) - 1))
     print("Profit: {}".format(profit))
+    print("Fuel used: {}T".format(int(fuel_needed)+1))
 
     x = []
     y = []

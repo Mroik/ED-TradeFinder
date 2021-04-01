@@ -6,6 +6,14 @@ import sys
 
 sys.setrecursionlimit(999999)
 
+# More info on fuel usage here https://elite-dangerous.fandom.com/wiki/Frame_Shift_Drive
+def fuelUsage(frameShiftRating, jumpDistance, shipMass, idealMass, frameShiftPower):
+    ris = jumpDistance * (shipMass / idealMass)
+    ris = ris ** frameShiftPower
+    ris = frameShiftRating * ris
+    ris = ris * 0.001
+    return ris
+
 def distance(x1, y1, z1, x2, y2, z2):
     x = x1 - x2
     y = y1 - y2
@@ -83,10 +91,16 @@ def genNeighbors(max_jump, finish, galaxy):
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
+
     DB_FILE = "map.db"
     START = 1
     FINISH = 30
     MAX_JUMP = 25
+
+    FRAME_SHIFT_RATING = 10
+    SHIP_MASS = 140
+    IDEAL_MASS = 120
+    FRAME_SHIFT_POWER = 2.15
 
     visited_systems = []
     galaxy = {}
@@ -124,3 +138,21 @@ if __name__ == "__main__":
 
     print(galaxy[START]["name"])
     print(galaxy[FINISH]["name"])
+
+    fuel_needed = 0
+    for x in range(len(temp2)-1):
+        fuel_needed += fuelUsage(
+                FRAME_SHIFT_RATING,
+                distance(
+                    galaxy[temp2[x]]["x"],
+                    galaxy[temp2[x]]["y"],
+                    galaxy[temp2[x]]["z"],
+                    galaxy[temp2[x+1]]["x"],
+                    galaxy[temp2[x+1]]["y"],
+                    galaxy[temp2[x+1]]["z"]
+                ),
+                SHIP_MASS,
+                IDEAL_MASS,
+                FRAME_SHIFT_POWER
+        )
+    print("Fuel needed: {}T".format(int(fuel_needed)+1))
